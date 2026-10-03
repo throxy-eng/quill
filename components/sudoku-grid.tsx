@@ -11,6 +11,7 @@ interface SudokuGridProps {
   highlight_mistakes: boolean;
   is_paused: boolean;
   is_solved: boolean;
+  is_celebrating: boolean;
   on_select: (index: number) => void;
 }
 
@@ -21,6 +22,28 @@ function cell_label(index: number, value: number | null, is_given: boolean, cell
   if (value !== null) return `${place}, ${is_given ? "given" : "entered"} ${value}`;
   if (cell_notes.length > 0) return `${place}, notes ${cell_notes.join(" ")}`;
   return `${place}, empty`;
+}
+
+function WinCelebration() {
+  const cells = Array.from({ length: 81 }, (_, index) => index);
+  return (
+    <div className="pointer-events-none absolute inset-0 z-20" data-testid="win-celebration" role="status" aria-live="polite">
+      <div className="absolute inset-0 grid grid-cols-9 grid-rows-9">
+        {cells.map((index) => (
+          <span
+            key={index}
+            className="quill-win-cell"
+            style={{ animationDelay: `${(index % 9) * 45 + Math.floor(index / 9) * 35}ms` }}
+          />
+        ))}
+      </div>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <div className="quill-win-card rounded-2xl bg-[#f4a03c] px-7 py-4 text-center shadow-[0_12px_40px_rgba(180,90,10,0.35)]">
+          <p className="font-display text-[40px] font-medium leading-none text-neutral-950">Solved</p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function GridLines() {
@@ -62,6 +85,7 @@ export function SudokuGrid({
   highlight_mistakes,
   is_paused,
   is_solved,
+  is_celebrating,
   on_select,
 }: SudokuGridProps) {
   const selected_value = selected_index === null ? null : values[selected_index];
@@ -128,6 +152,7 @@ export function SudokuGrid({
         })}
       </div>
       <GridLines />
+      {is_celebrating ? <WinCelebration /> : null}
       {is_paused && !is_solved ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/80" data-testid="paused-overlay">
           <p className="text-[22px] font-medium tracking-wide text-neutral-950">Paused</p>

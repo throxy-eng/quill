@@ -195,6 +195,7 @@ export function PlayScreen({ puzzle }: PlayScreenProps) {
             highlight_mistakes={settings.highlight_mistakes}
             is_paused={game.is_paused}
             is_solved={game.status === "solved"}
+            is_celebrating={game.is_celebrating}
             on_select={game.select_cell}
           />
         ) : (

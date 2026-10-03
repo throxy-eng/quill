@@ -1,7 +1,8 @@
-import { useEffect, useReducer, useRef } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import { fresh_from_puzzle, reduce_game, to_persisted } from "@/lib/game-state";
 import type { Puzzle } from "@/lib/puzzles";
 import { clear_game, load_game, save_game } from "@/lib/storage";
+import { play_win_tune } from "@/lib/win-tune";
 
 export function use_game(puzzle: Puzzle) {
   const [state, dispatch] = useReducer(reduce_game, puzzle, fresh_from_puzzle);
@@ -9,6 +10,15 @@ export function use_game(puzzle: Puzzle) {
   state_ref.current = state;
   const puzzle_ref = useRef(puzzle);
   puzzle_ref.current = puzzle;
+  const [is_celebrating, set_is_celebrating] = useState(false);
+  const celebrate_timer = useRef<number | null>(null);
+
+  function begin_celebration() {
+    play_win_tune();
+    set_is_celebrating(true);
+    if (celebrate_timer.current !== null) window.clearTimeout(celebrate_timer.current);
+    celebrate_timer.current = window.setTimeout(() => set_is_celebrating(false), 5600);
+  }
 
   useEffect(() => {
     const current_puzzle = puzzle_ref.current;
@@ -46,7 +56,16 @@ export function use_game(puzzle: Puzzle) {
 
   function restart() {
     clear_game(puzzle.id);
+    set_is_celebrating(false);
+    if (celebrate_timer.current !== null) window.clearTimeout(celebrate_timer.current);
     dispatch({ type: "restart", puzzle });
+  }
+
+  function press_digit(digit: number) {
+    const current = state_ref.current;
+    const next = reduce_game(current, { type: "digit", digit });
+    if (current.status !== "solved" && next.status === "solved") begin_celebration();
+    dispatch({ type: "digit", digit });
   }
 
   const is_current = state.is_ready && state.puzzle_id === puzzle.id;
@@ -64,8 +83,9 @@ export function use_game(puzzle: Puzzle) {
     auto_candidate: state.auto_candidate,
     can_undo: state.undo_stack.length > 0 && state.status !== "solved",
     selected_index: state.selected_index,
+    is_celebrating,
     select_cell: (index: number) => dispatch({ type: "select", index }),
-    press_digit: (digit: number) => dispatch({ type: "digit", digit }),
+    press_digit,
     erase: () => dispatch({ type: "erase" }),
     undo: () => dispatch({ type: "undo" }),
     toggle_pause: () => dispatch({ type: "toggle_pause" }),
