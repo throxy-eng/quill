@@ -11,7 +11,7 @@ import { PhoneShell } from "@/components/phone-shell";
 import { SudokuGrid } from "@/components/sudoku-grid";
 import { use_game } from "@/hooks/use-game";
 import { use_settings } from "@/hooks/use-settings";
-import { auto_candidate_marks, digits } from "@/lib/board";
+import { digits, visible_auto_candidates } from "@/lib/board";
 import { format_clock } from "@/lib/clock";
 import { input_mode_label } from "@/lib/game-state";
 import { difficulty_label, type Puzzle } from "@/lib/puzzles";
@@ -82,7 +82,7 @@ export function PlayScreen({ puzzle }: PlayScreenProps) {
   const { settings, update_settings } = use_settings();
   const [open_panel, set_open_panel] = useState<PanelName["name"] | null>(null);
   const is_locked = !game.is_ready || game.is_paused || game.status === "solved";
-  const display_notes = game.auto_candidate ? auto_candidate_marks(game.values) : game.notes;
+  const display_notes = game.auto_candidate ? visible_auto_candidates(game.values, game.removed) : game.notes;
 
   useEffect(() => {
     function on_key(event: KeyboardEvent) {
@@ -280,7 +280,7 @@ export function PlayScreen({ puzzle }: PlayScreenProps) {
                 <p><span className="font-semibold">Normal</span> writes the digit you tap into the selected cell.</p>
                 <p><span className="font-semibold">Candidate</span> toggles that digit as a note in the selected cell.</p>
                 <p>
-                  <span className="font-semibold">Auto Candidate Mode</span> shows every digit still legal in an empty cell’s row, column, and box, and refreshes those marks after each change. Manual notes pause while it is on. Turn it off and only the notes you toggled remain.
+                  <span className="font-semibold">Auto Candidate Mode</span> starts on. Empty cells show every digit still legal in the row, column, and box, refreshed after each change. In Candidate mode, tap a shown digit to remove it. It stays off until you tap it again, and it returns only if it is still legal. Turn Auto Candidate off and only the notes you entered yourself remain.
                 </p>
               </div>
             </>

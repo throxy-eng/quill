@@ -41,6 +41,17 @@ export function auto_candidate_marks(values: readonly (number | null)[]): number
   return values.map((value, index) => (value === null ? legal_digits(values, index) : []));
 }
 
+export function visible_auto_candidates(
+  values: readonly (number | null)[],
+  removed: readonly (readonly number[])[],
+): number[][] {
+  return values.map((value, index) => {
+    if (value !== null) return [];
+    const blocked = new Set(removed[index] ?? []);
+    return legal_digits(values, index).filter((digit) => !blocked.has(digit));
+  });
+}
+
 export function first_empty_index(values: readonly (number | null)[]): number | null {
   const index = values.findIndex((value) => value === null);
   return index === -1 ? null : index;

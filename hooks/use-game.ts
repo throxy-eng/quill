@@ -55,6 +55,7 @@ export function use_game(puzzle: Puzzle) {
     is_ready: is_current,
     values: state.values,
     notes: state.notes,
+    removed: state.removed,
     elapsed_ms: state.elapsed_ms,
     is_paused: state.is_paused,
     status: state.status,

@@ -1,5 +1,5 @@
 import { empty_notes, first_empty_index, values_from_givens } from "./board";
-import { apply_undo, erase_cell, is_solved, place_digit, toggle_candidate, type UndoEntry } from "./game";
+import { apply_undo, erase_cell, is_solved, place_digit, toggle_auto_candidate, toggle_candidate, type UndoEntry } from "./game";
 import type { Puzzle } from "./puzzles";
 import type { PersistedGame } from "./storage";
 
@@ -20,6 +20,7 @@ export interface GameState {
   solution: number[];
   values: Array<number | null>;
   notes: number[][];
+  removed: number[][];
   elapsed_ms: number;
   is_paused: boolean;
   status: "in_progress" | "solved";
@@ -101,12 +102,13 @@ export function fresh_from_puzzle(puzzle: Puzzle, timer_epoch = 0): GameState {
     solution: puzzle.solution.slice(),
     values,
     notes: empty_notes(),
+    removed: empty_notes(),
     elapsed_ms: 0,
     is_paused: false,
     status: "in_progress",
     finished_ms: null,
     input_mode: "normal",
-    auto_candidate: false,
+    auto_candidate: true,
     undo_stack: [],
     selected_index: first_empty_index(values),
     is_ready: false,
@@ -119,6 +121,7 @@ export function to_persisted(state: GameState): PersistedGame {
   return {
     values: state.values,
     notes: state.notes,
+    removed: state.removed,
     elapsed_ms: state.elapsed_ms,
     is_paused: state.is_paused,
     status: state.status === "solved" ? "solved" : "in_progress",
@@ -131,15 +134,16 @@ export function to_persisted(state: GameState): PersistedGame {
 }
 
 function board_of(state: GameState) {
-  return { values: state.values, notes: state.notes };
+  return { values: state.values, notes: state.notes, removed: state.removed };
 }
 
-function with_move(state: GameState, result: { board: { values: Array<number | null>; notes: number[][] }; undo_entry: UndoEntry | null; is_solved: boolean }): GameState {
+function with_move(state: GameState, result: { board: { values: Array<number | null>; notes: number[][]; removed: number[][] }; undo_entry: UndoEntry | null; is_solved: boolean }): GameState {
   if (!result.undo_entry) return state;
   const next: GameState = {
     ...state,
     values: result.board.values,
     notes: result.board.notes,
+    removed: result.board.removed,
     undo_stack: [...state.undo_stack, result.undo_entry].slice(-100),
     has_started: true,
   };
@@ -149,6 +153,15 @@ function with_move(state: GameState, result: { board: { values: Array<number | n
     next.is_paused = true;
   }
   return next;
+}
+
+function sanitize_removed(saved_removed: number[][] | undefined): number[][] {
+  return Array.from({ length: 81 }, (_, index) => {
+    const cell = saved_removed?.[index];
+    if (!Array.isArray(cell)) return [];
+    const cleaned = cell.filter((digit) => Number.isInteger(digit) && digit >= 1 && digit <= 9);
+    return [...new Set(cleaned)].sort((left, right) => left - right);
+  });
 }
 
 function sanitize_notes(saved_notes: number[][] | undefined, values: Array<number | null>): number[][] {
@@ -187,6 +200,7 @@ function hydrate_saved(puzzle: Puzzle, saved: PersistedGame, timer_epoch: number
     values[index] = typeof saved_value === "number" && saved_value >= 1 && saved_value <= 9 ? saved_value : null;
   }
   const notes = sanitize_notes(saved.notes, values);
+  const removed = sanitize_removed(saved.removed);
   const solved = is_solved(values, puzzle.solution);
   const selected = saved.selected_index;
   const selected_index = typeof selected === "number" && selected >= 0 && selected < 81 ? selected : first_empty_index(values);
@@ -194,6 +208,7 @@ function hydrate_saved(puzzle: Puzzle, saved: PersistedGame, timer_epoch: number
     ...fresh,
     values,
     notes,
+    removed,
     elapsed_ms: Number.isFinite(saved.elapsed_ms) ? Math.max(0, saved.elapsed_ms) : 0,
     is_paused: solved ? true : Boolean(saved.is_paused),
     status: solved ? "solved" : "in_progress",
@@ -224,8 +239,11 @@ export function reduce_game(state: GameState, action: GameAction): GameState {
       if (state.status === "solved" || state.is_paused || state.selected_index === null) return state;
       const index = state.selected_index;
       if (state.input_mode === "candidate") {
-        if (state.auto_candidate) return state;
-        return with_move(state, toggle_candidate(board_of(state), state.givens, index, action.digit, state.solution));
+        const board = board_of(state);
+        if (state.auto_candidate) {
+          return with_move(state, toggle_auto_candidate(board, state.givens, index, action.digit, state.solution));
+        }
+        return with_move(state, toggle_candidate(board, state.givens, index, action.digit, state.solution));
       }
       return with_move(state, place_digit(board_of(state), state.givens, index, action.digit, state.solution));
     }
@@ -244,6 +262,7 @@ export function reduce_game(state: GameState, action: GameAction): GameState {
         ...state,
         values: board.values,
         notes: board.notes,
+        removed: board.removed,
         undo_stack: state.undo_stack.slice(0, -1),
         has_started: true,
         selected_index: entry.index,

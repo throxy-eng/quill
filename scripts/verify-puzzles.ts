@@ -1,4 +1,4 @@
-import { auto_candidate_marks } from "../lib/board";
+import { visible_auto_candidates } from "../lib/board";
 import { fresh_from_puzzle, reduce_game } from "../lib/game-state";
 import { puzzles, type Puzzle } from "../lib/puzzles";
 import { count_solutions, is_valid_solution } from "../lib/solver";
@@ -37,6 +37,8 @@ assert(count_solutions(puzzles[0].solution, 2) === 1, "a finished grid should ha
 
 const puzzle = puzzles[0];
 let state = reduce_game(fresh_from_puzzle(puzzle), { type: "hydrate", puzzle, saved: null });
+assert(state.auto_candidate, "a new puzzle starts with auto candidate on");
+state = reduce_game(state, { type: "set_auto", auto_candidate: false });
 const placed_index = state.selected_index;
 if (placed_index === null) throw new Error("a new puzzle selects an empty cell");
 const correct = puzzle.solution[placed_index];
@@ -61,14 +63,21 @@ state = reduce_game(state, { type: "digit", digit: 4 });
 assert(state.notes[note_index].join(",") === "7", "tapping a note again removes it");
 
 const manual_notes = state.notes.map((cell) => cell.slice());
+state = reduce_game(state, { type: "set_mode", input_mode: "candidate" });
 state = reduce_game(state, { type: "set_auto", auto_candidate: true });
 assert(state.notes[note_index].join(",") === manual_notes[note_index].join(","), "auto mode keeps manual notes stored");
-state = reduce_game(state, { type: "digit", digit: 2 });
-assert(state.notes[note_index].join(",") === "7", "auto mode pauses manual candidate edits");
-const computed = auto_candidate_marks(state.values);
-assert(computed[note_index].length > 0, "auto mode has legal digits for an empty cell");
-assert(state.notes[note_index].join(",") === "7", "stored notes stay separate from computed marks");
-for (const digit of computed[note_index]) {
+const shown = visible_auto_candidates(state.values, state.removed)[note_index];
+assert(shown.length > 0, "auto mode has legal digits for an empty cell");
+const removed_digit = shown[0];
+state = reduce_game(state, { type: "digit", digit: removed_digit });
+const after_remove = visible_auto_candidates(state.values, state.removed)[note_index];
+assert(!after_remove.includes(removed_digit), "a removed auto candidate stays off");
+assert(state.notes[note_index].join(",") === "7", "removing an auto candidate does not change manual notes");
+state = reduce_game(state, { type: "digit", digit: removed_digit });
+const after_restore = visible_auto_candidates(state.values, state.removed)[note_index];
+assert(after_restore.includes(removed_digit), "pressing a removed legal digit brings it back");
+const computed = after_restore;
+for (const digit of computed) {
   const row = Math.floor(note_index / 9);
   const col = note_index % 9;
   for (let offset = 0; offset < 9; offset += 1) {

@@ -3,6 +3,7 @@ import type { UndoEntry } from "./game";
 export interface PersistedGame {
   values: Array<number | null>;
   notes: number[][];
+  removed?: number[][];
   elapsed_ms: number;
   is_paused: boolean;
   status: "in_progress" | "solved";
